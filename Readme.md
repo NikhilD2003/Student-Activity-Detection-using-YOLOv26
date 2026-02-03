@@ -235,10 +235,15 @@ Tracking behavior after tuning:
 ---
 
 ---
-
 # 6️⃣ Interactive Streamlit Dashboard
 
 <img width="1864" height="886" alt="image" src="https://github.com/user-attachments/assets/ec94dceb-4091-4077-b454-10503691ed02" />
+
+# Results of Streamlit Dashboard:
+
+<img width="492" height="713" alt="Screenshot 2026-02-03 170002" src="https://github.com/user-attachments/assets/0930625a-47c2-450c-ba14-e642dc7ac69d" />
+
+<img width="489" height="714" alt="Screenshot 2026-02-03 170022" src="https://github.com/user-attachments/assets/0802bd59-5a66-4c1f-ae87-3234dc5d152b" />
 
 Launch locally:
 
@@ -254,3 +259,4 @@ Dashboard features:
 • temporal timelines
 • CSV/video downloads
 • per-student analytics
+
