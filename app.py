@@ -11,15 +11,27 @@ from analytics import compute_analytics
 # ============================================================
 # FFMPEG RE-ENCODER (Browser Safe)
 # ============================================================
-FFMPEG_PATH = r"C:\ffmpeg\bin\ffmpeg.exe"
+import shutil
+import subprocess
+
+
 def reencode_for_browser(src, dst):
     """
     Convert any video into H264 + AAC so Streamlit/browser can play it.
-    Requires ffmpeg in PATH.
+    Works cross-platform (Windows + Linux).
     """
 
+    ffmpeg_bin = shutil.which("ffmpeg")
+
+    if ffmpeg_bin is None:
+        raise RuntimeError(
+            "FFmpeg not found in environment. "
+            "For Streamlit Cloud: ensure packages.txt contains 'ffmpeg' "
+            "and redeploy the app."
+        )
+
     cmd = [
-        FFMPEG_PATH,
+        ffmpeg_bin,
         "-y",
         "-i", src,
         "-vcodec", "libx264",
@@ -30,12 +42,7 @@ def reencode_for_browser(src, dst):
         dst,
     ]
 
-    subprocess.run(
-        cmd,
-        stdout=subprocess.DEVNULL,
-        stderr=subprocess.DEVNULL,
-        check=True,
-    )
+    subprocess.run(cmd, check=True)
 
 
 # ============================================================
