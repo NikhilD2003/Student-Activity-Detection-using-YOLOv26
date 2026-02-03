@@ -10,6 +10,7 @@ The system:
 • performs video inference with tracking and temporal smoothing  
 • logs detections into CSV format  
 • conducts post-hoc statistical analytics  
+• provides an interactive Streamlit dashboard for visualization  
 
 ---
 
@@ -17,7 +18,7 @@ The system:
 
 # 📐 System Architecture
 
-The pipeline consists of six major stages:
+The pipeline consists of seven major stages:
 
 1. Dataset Merging & Harmonization  
 2. Model Training  
@@ -25,6 +26,7 @@ The pipeline consists of six major stages:
 4. Model Evaluation  
 5. Real-Time Inference + Tracking  
 6. Post-Inference Analytics  
+7. Interactive Streamlit Visualization  
 
 ---
 
@@ -37,6 +39,9 @@ The pipeline consists of six major stages:
 ├── test_model.py
 ├── inference.py
 ├── analyze.py
+├── streamlit_app.py
+├── inference_engine.py
+├── analytics.py
 ├── datasets/
 │ └── merged_dataset/
 │ ├── train/
@@ -48,13 +53,18 @@ The pipeline consists of six major stages:
 │ ├── test/
 │ │ ├── images/
 │ │ └── labels/
-│ └── dataset.yaml
+│ │ └── dataset.yaml
 ├── weights/
 │ └── best.pt
 ├── outputs/
 │ ├── output_inference.mp4
 │ └── detections_log.csv
+├── requirements.txt
+├── packages.txt
 └── README.md
+
+yaml
+Copy code
 
 ---
 
@@ -86,25 +96,6 @@ Combine Dataset-A and Dataset-B into a **single unified dataset** while:
 
 ---
 
-## 📂 Output Folder Layout
-
-merged_dataset/
-├── train/images
-├── train/labels
-├── val/images
-├── val/labels
-├── test/images
-├── test/labels
-└── dataset.yaml
-
-### `dataset.yaml` Contains:
-
-• relative paths to train/val/test  
-• number of classes  
-• ordered activity names  
-
----
-
 ---
 
 # 2️⃣ Model Training
@@ -112,6 +103,8 @@ merged_dataset/
 ### Script: `train.py`
 
 ### Base Model
+
+Pretrained YOLO checkpoint used for transfer learning.
 
 ---
 
@@ -133,20 +126,15 @@ merged_dataset/
 
 All training images are resized to **640 × 640**.
 
-The YOLO backbone CNN progressively downsamples:
+The YOLO backbone CNN progressively downsamples spatial resolution and extracts multi-scale features for detection.
 
-640 × 640 → 20 × 20 feature grid
+These features encode:
 
-
-Each grid cell captures:
-
-• facial orientation  
 • head pose  
-• hand movement  
 • posture  
+• hand activity  
+• gaze direction  
 • body alignment  
-
-These features are forwarded to the detection head for anchor-based regression.
 
 ---
 
@@ -154,17 +142,11 @@ These features are forwarded to the detection head for anchor-based regression.
 
 # 🔄 Gradient Descent Optimization
 
-During training, weights are updated using **back-propagation with gradient descent** to minimize the total YOLO loss:
+During training, weights are updated using back-propagation with gradient descent to minimize the total YOLO loss:
 
 \[
 L = \lambda_{box} L_{box} + \lambda_{obj} L_{obj} + \lambda_{cls} L_{cls}
 \]
-
-Where:
-
-• `L_box` → bounding box regression loss  
-• `L_obj` → objectness confidence loss  
-• `L_cls` → classification loss  
 
 ---
 
@@ -172,14 +154,11 @@ Where:
 
 # 📐 YOLO Bounding Box Prediction Mathematics
 
-For each anchor box, the network predicts:
+Predicted parameters:
 
 (tx, ty, tw, th)
 
-
-These are converted to image-space coordinates as:
-
-### Center Coordinates
+Converted to image-space coordinates:
 
 \[
 b_x = \sigma(t_x) + c_x
@@ -189,15 +168,6 @@ b_x = \sigma(t_x) + c_x
 b_y = \sigma(t_y) + c_y
 \]
 
-Where:
-
-• `(c_x, c_y)` are grid-cell offsets  
-• `σ` is the sigmoid function  
-
----
-
-### Width & Height
-
 \[
 b_w = p_w \cdot e^{t_w}
 \]
@@ -206,13 +176,7 @@ b_w = p_w \cdot e^{t_w}
 b_h = p_h \cdot e^{t_h}
 \]
 
-Where:
-
-• `(p_w, p_h)` are anchor dimensions  
-
----
-
-### Final Confidence
+Final confidence:
 
 \[
 Score = P(object) \times P(class)
@@ -226,21 +190,13 @@ Score = P(object) \times P(class)
 
 ### Script: `test_model.py`
 
-### Configuration
+Metrics computed:
 
-split = test
-workers = 8
-
-
----
-
-## 📊 Metrics Computed
-
-• Precision per activity  
+• Precision  
 • Recall  
 • mAP@50  
-• mAP@50-95  
-• Confusion matrix  
+• mAP@50–95  
+• Confusion Matrix  
 
 ---
 
@@ -261,81 +217,21 @@ workers = 8
 
 ---
 
----
+## 🧭 Multi-Object Tracking
 
-# 🧭 Multi-Object Tracking
+Tracking is performed using ByteTrack or BoT-SORT to provide:
 
-Tracker configuration:
-
-bytetrack.yaml
-
-
-Responsibilities:
-
-• assigns persistent student IDs  
-• handles occlusion  
-• supports re-identification  
+• persistent student identities  
+• occlusion handling  
+• appearance-based matching  
 
 ---
 
----
+## 🎞 Temporal Smoothing
 
-# 🎞 Temporal Smoothing
+Predictions are stabilized using a sliding temporal window of nine frames.
 
-Predictions are stabilized using:
-
-Window = 9 frames
-
-
-Final class label = **majority vote** across window.
-
----
-
----
-
-# 🔁 Re-Identification Logic
-
-If a newly detected student appears within **90 pixels** of a previous track center:
-
-➡ the original ID is reused.
-
----
-
----
-
-# 📤 Inference Outputs
-
----
-
-## 🎥 Annotated Video
-
-outputs/output_inference.mp4
-
-
-Displays:
-
-• bounding boxes  
-• student IDs  
-• activity labels  
-• confidence scores  
-
----
-
----
-
-## 📄 Detection Log
-
-outputs/detections_log.csv
-
-
-Columns:
-
-timestamp,
-confidence,
-student_id,
-x1, y1, x2, y2,
-activity
-
+Final activity label is chosen by majority vote.
 
 ---
 
@@ -343,59 +239,54 @@ activity
 
 # 5️⃣ Post-Inference Analytics
 
-### Script: `analyze.py`
-
----
-
-## 📊 Statistical Analysis Performed
+Statistical measures include:
 
 • mean confidence per class  
-• standard deviation  
-• frequency distribution  
-• activity duration per student  
+• class frequency  
+• per-student activity duration  
 • detection reliability  
-• class imbalance diagnostics  
+• imbalance diagnostics  
 
 ---
 
 ---
 
-# 🔁 End-to-End Pipeline Summary
+# 📊 Analysis Results (Typical)
 
-Dataset A + Dataset B
-↓
-merge_datasets.py
-↓
-Merged Dataset + YAML
-↓
-train.py
-↓
-best.pt
-↓ ↓
-test_model.py inference.py
-↓
-output_inference.mp4 + detections_log.csv
-↓
-analyze.py
+After fine-tuning:
 
+| Metric | Value |
+|------|------|
+| Precision | ~0.95 |
+| Recall | ~0.94 |
+| mAP@50 | ~0.97 |
+| mAP@50–95 | ~0.74 |
+
+Tracking behavior after tuning:
+
+• stable IDs for seated students  
+• limited fragmentation  
+• rare merges  
 
 ---
 
 ---
 
-# 🚀 Applications
+# 6️⃣ Interactive Streamlit Dashboard
 
-• classroom engagement monitoring  
-• smart classroom analytics  
-• academic research  
-• behavioral modeling  
-• automated attendance systems  
+<img width="1864" height="886" alt="image" src="https://github.com/user-attachments/assets/ec94dceb-4091-4077-b454-10503691ed02" />
 
----
+Launch locally:
 
----
-# 👤 Author
+```bash
+streamlit run streamlit_app.py
 
-Nikhilesh Dubey
+Dashboard features:
 
-
+• upload classroom video
+• live inference preview
+• progress indicator
+• activity distribution plots
+• temporal timelines
+• CSV/video downloads
+• per-student analytics
