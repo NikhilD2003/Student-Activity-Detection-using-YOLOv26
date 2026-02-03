@@ -1,0 +1,13 @@
+names:
+- Looking_Forward
+- Raising_Hand
+- Reading
+- Sleeping
+- Turning_Around
+- phone
+- sleep
+- study
+nc: 8
+test: ../test/images
+train: ../train/images
+val: ../val/images
