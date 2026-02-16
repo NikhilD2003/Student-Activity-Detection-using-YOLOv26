@@ -6,6 +6,10 @@ from ultralytics import YOLO
 import numpy as np
 
 
+# ============================================================
+# 🔵 VIDEO FILE INFERENCE (UNCHANGED)
+# ============================================================
+
 def run_inference_streaming(
     video_path,
     output_video,
@@ -48,15 +52,8 @@ def run_inference_streaming(
     csv_writer = csv.writer(csv_file)
 
     csv_writer.writerow([
-        "timestamp",
-        "frame",
-        "student_id",
-        "class_name",
-        "confidence",
-        "x1",
-        "y1",
-        "x2",
-        "y2",
+        "timestamp", "frame", "student_id", "class_name",
+        "confidence", "x1", "y1", "x2", "y2",
     ])
 
     track_history = defaultdict(lambda: deque(maxlen=SMOOTHING_FRAMES))
@@ -66,8 +63,6 @@ def run_inference_streaming(
     next_student_id = 1
 
     frame_num = 0
-
-    # 🔥 For real-time playback feel
     start_time = time.time()
 
     while True:
@@ -149,15 +144,11 @@ def run_inference_streaming(
                     student_id,
                     smooth_class,
                     round(conf, 3),
-                    x1,
-                    y1,
-                    x2,
-                    y2,
+                    x1, y1, x2, y2,
                 ])
 
         writer.write(annotated)
 
-        # ✅ VIDEO-SPEED PREVIEW
         if frame_callback:
 
             preview = cv2.resize(annotated, PREVIEW_SIZE)
@@ -174,3 +165,88 @@ def run_inference_streaming(
     csv_file.close()
 
     return output_video, csv_path
+
+
+# ============================================================
+# 🔴 LIVE CAMERA — FRAME-BY-FRAME INFERENCE
+# ============================================================
+
+def run_inference_frame(frame, model, state):
+
+    CONF_THRESH = 0.30
+    IOU_THRESH = 0.45
+    IMG_SIZE = 640
+    TRACKER_CFG = "botsort.yaml"
+
+    SMOOTHING_FRAMES = state["SMOOTHING_FRAMES"]
+    MIN_TRACK_AGE = state["MIN_TRACK_AGE"]
+
+    results = model.track(
+        source=frame,
+        persist=True,
+        conf=CONF_THRESH,
+        iou=IOU_THRESH,
+        imgsz=IMG_SIZE,
+        tracker=TRACKER_CFG,
+        verbose=False,
+        rect=True
+    )
+
+    annotated = frame.copy()
+    rows = []
+
+    if results and results[0].boxes is not None:
+
+        for box in results[0].boxes:
+
+            if box.id is None:
+                continue
+
+            raw_id = int(box.id[0])
+
+            xyxy = box.xyxy[0].cpu().numpy()
+            cls_id = int(box.cls[0])
+            conf = float(box.conf[0])
+
+            x1, y1, x2, y2 = map(int, xyxy)
+
+            class_name = model.names[cls_id]
+
+            if raw_id not in state["track_to_student"]:
+                state["track_to_student"][raw_id] = state["next_student_id"]
+                state["next_student_id"] += 1
+
+            student_id = state["track_to_student"][raw_id]
+
+            state["track_history"][student_id].append(class_name)
+            state["track_age"][student_id] += 1
+
+            if state["track_age"][student_id] < MIN_TRACK_AGE:
+                continue
+
+            smooth_class = max(
+                set(state["track_history"][student_id]),
+                key=state["track_history"][student_id].count,
+            )
+
+            label = f"Student {student_id}: {smooth_class}"
+
+            cv2.rectangle(annotated, (x1, y1), (x2, y2), (0, 255, 0), 2)
+            cv2.putText(
+                annotated,
+                label,
+                (x1, y1 - 8),
+                cv2.FONT_HERSHEY_SIMPLEX,
+                0.55,
+                (0, 255, 0),
+                2,
+            )
+
+            rows.append([
+                student_id,
+                smooth_class,
+                conf,
+                x1, y1, x2, y2
+            ])
+
+    return annotated, rows
