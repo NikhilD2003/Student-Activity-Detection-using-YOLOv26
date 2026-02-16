@@ -35,10 +35,8 @@ def compute_analytics(csv_path):
     # ⏱ PER-STUDENT ACTIVITY DURATION (IN SECONDS)
     # =========================================================
 
-    # Sort for correct time difference calculation
     df = df.sort_values(["student_id", "timestamp"])
 
-    # Time difference between consecutive detections per student
     df["time_diff"] = df.groupby("student_id")["timestamp"].diff().fillna(0)
 
     student_activity_duration = (
@@ -58,12 +56,22 @@ def compute_analytics(csv_path):
     )
 
     # =========================================================
+    # ✅ TEMPORAL FILTER — REMOVE NOISE (< 1 SECOND)
+    # =========================================================
+
+    MIN_DURATION = 1.0
+
+    student_activity_duration = student_activity_duration[
+        student_activity_duration["duration_seconds"] >= MIN_DURATION
+    ]
+
+    # =========================================================
 
     return {
         "total_students": total_students,
         "activity_counts": activity_counts,
         "activity_distribution": activity_distribution,
         "timeline": timeline,
-        "student_activity_duration": student_activity_duration,  # ✅ NEW
+        "student_activity_duration": student_activity_duration,
         "raw_df": df,
     }
