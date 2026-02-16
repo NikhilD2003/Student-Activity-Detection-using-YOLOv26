@@ -17,14 +17,14 @@ from analytics import compute_analytics, compute_analytics_from_df
 
 
 # ============================================================
-# 🔇 SUPPRESS WEBRTC THREAD SHUTDOWN ERRORS
+# 🔇 SUPPRESS WEBRTC WARNINGS
 # ============================================================
 
 logging.getLogger("streamlit_webrtc").setLevel(logging.ERROR)
 
 
 # ============================================================
-# 🌐 RTC CONFIG (FIX FOR STREAMLIT CLOUD)
+# 🌐 RTC CONFIG
 # ============================================================
 
 RTC_CONFIGURATION = {
@@ -40,9 +40,6 @@ def reencode_for_browser(src, dst):
 
     ffmpeg_bin = shutil.which("ffmpeg")
 
-    if ffmpeg_bin is None:
-        raise RuntimeError("FFmpeg not found")
-
     cmd = [
         ffmpeg_bin, "-y", "-i", src,
         "-vcodec", "libx264",
@@ -57,7 +54,7 @@ def reencode_for_browser(src, dst):
 
 
 # ============================================================
-# SESSION STATE INIT
+# SESSION STATE
 # ============================================================
 
 if "live_df" not in st.session_state:
@@ -80,45 +77,57 @@ mode = st.radio("Select Input Mode", ["Upload Video", "Live Camera"])
 
 
 # ============================================================
-# 🔴 LIVE CAMERA MODE (CLOUD READY)
+# 🔴 LIVE MODE
 # ============================================================
 
 if mode == "Live Camera":
 
     class VideoProcessor(VideoProcessorBase):
 
+        def __init__(self):
+            self.frame_count = 0
+            self.skip = 5   # 🔥 run YOLO every 5 frames
+
         def recv(self, frame):
 
             img = frame.to_ndarray(format="bgr24")
+            self.frame_count += 1
 
-            st.session_state.frame_count += 1
-            timestamp = st.session_state.frame_count / 30
+            annotated = img
 
-            results = st.session_state.model.track(
-                img, persist=True, verbose=False
-            )
+            # 🚀 Run detection every N frames
+            if self.frame_count % self.skip == 0:
 
-            annotated = results[0].plot()
+                results = st.session_state.model.track(
+                    img,
+                    persist=True,
+                    conf=0.3,
+                    verbose=False
+                )
 
-            if results[0].boxes.id is not None:
+                annotated = results[0].plot()
 
-                ids = results[0].boxes.id.cpu().numpy().astype(int)
-                cls = results[0].boxes.cls.cpu().numpy().astype(int)
-                conf = results[0].boxes.conf.cpu().numpy()
-                boxes = results[0].boxes.xyxy.cpu().numpy()
+                if results[0].boxes.id is not None:
 
-                for i in range(len(ids)):
+                    ids = results[0].boxes.id.cpu().numpy().astype(int)
+                    cls = results[0].boxes.cls.cpu().numpy().astype(int)
+                    conf = results[0].boxes.conf.cpu().numpy()
+                    boxes = results[0].boxes.xyxy.cpu().numpy()
 
-                    st.session_state.live_df.loc[
-                        len(st.session_state.live_df)
-                    ] = [
-                        timestamp,
-                        st.session_state.frame_count,
-                        ids[i],
-                        st.session_state.model.names[cls[i]],
-                        conf[i],
-                        *boxes[i]
-                    ]
+                    timestamp = self.frame_count / 30
+
+                    for i in range(len(ids)):
+
+                        st.session_state.live_df.loc[
+                            len(st.session_state.live_df)
+                        ] = [
+                            timestamp,
+                            self.frame_count,
+                            ids[i],
+                            st.session_state.model.names[cls[i]],
+                            conf[i],
+                            *boxes[i]
+                        ]
 
             return av.VideoFrame.from_ndarray(annotated, format="bgr24")
 
@@ -143,10 +152,7 @@ if mode == "Live Camera":
 
             st.subheader("📊 Live Summary")
 
-            st.metric(
-                "Total Students",
-                analytics["total_students"]
-            )
+            st.metric("Total Students", analytics["total_students"])
 
             fig = px.bar(
                 analytics["activity_distribution"],
@@ -169,7 +175,7 @@ if mode == "Live Camera":
 
 
 # ============================================================
-# 🔵 UPLOAD VIDEO MODE (UNCHANGED)
+# 🔵 UPLOAD MODE (UNCHANGED)
 # ============================================================
 
 elif mode == "Upload Video":
@@ -230,9 +236,6 @@ elif mode == "Upload Video":
 
                 with open(browser_video, "rb") as f:
                     video_bytes = f.read()
-
-                with open(out_csv, "rb") as f:
-                    csv_bytes = f.read()
 
                 analytics = compute_analytics(out_csv)
 
