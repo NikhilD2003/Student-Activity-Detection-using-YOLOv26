@@ -4,6 +4,7 @@ import os
 import cv2
 import subprocess
 import shutil
+import plotly.express as px   # ✅ added for proper chart
 
 from inference_engine import run_inference_streaming
 from analytics import compute_analytics
@@ -78,15 +79,13 @@ if uploaded_file:
 
             def frame_cb(frame):
 
-                # ✅ resize only for preview (huge speed gain)
                 preview = cv2.resize(frame, (960, 540))
-
                 rgb = cv2.cvtColor(preview, cv2.COLOR_BGR2RGB)
 
                 frame_slot.image(
                     rgb,
                     channels="RGB",
-                    use_container_width=True,   # faster rendering
+                    use_container_width=True,
                 )
 
             # ----------------------------------
@@ -153,7 +152,21 @@ if uploaded_file:
                 )
 
                 st.subheader("Activity Distribution")
-                st.bar_chart(analytics["activity_counts"])
+
+                # ✅ NEW PLOTLY BAR CHART
+                fig = px.bar(
+                    analytics["activity_distribution"],
+                    x="class_name",
+                    y="frames",
+                    hover_data=["students"],
+                    labels={
+                        "class_name": "Activity",
+                        "frames": "Total Frames",
+                        "students": "Student IDs",
+                    },
+                )
+
+                st.plotly_chart(fig, use_container_width=True)
 
                 st.download_button(
                     "⬇ Download CSV",
