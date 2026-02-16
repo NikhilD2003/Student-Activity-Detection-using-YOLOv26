@@ -1,5 +1,6 @@
 import cv2
 import csv
+import time
 from collections import defaultdict, deque
 from ultralytics import YOLO
 import numpy as np
@@ -24,9 +25,10 @@ def run_inference_streaming(
     SMOOTHING_FRAMES = 9
     MIN_TRACK_AGE = 8
 
-    # ✅ NEW — controls preview speed
-    DISPLAY_EVERY_N_FRAMES = 5
+    # 🔥 Preview control
+    PREVIEW_FPS = 6
     PREVIEW_SIZE = (960, 540)
+    last_preview_time = 0
 
     model = YOLO(model_path)
 
@@ -154,10 +156,13 @@ def run_inference_streaming(
 
         writer.write(annotated)
 
-        # ✅ FAST & SMOOTH PREVIEW (ONLY CHANGE)
-        if frame_callback and frame_num % DISPLAY_EVERY_N_FRAMES == 0:
-            preview = cv2.resize(annotated, PREVIEW_SIZE)
-            frame_callback(preview)
+        # ✅ Smooth preview with fixed FPS
+        if frame_callback:
+            current_time = time.time()
+            if current_time - last_preview_time >= 1 / PREVIEW_FPS:
+                preview = cv2.resize(annotated, PREVIEW_SIZE)
+                frame_callback(preview)
+                last_preview_time = current_time
 
     cap.release()
     writer.release()
