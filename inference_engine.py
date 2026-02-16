@@ -19,7 +19,7 @@ def run_inference_streaming(
     IMG_SIZE = 768
 
     TRACKER_CFG = "botsort.yaml"
-    DEVICE = 0
+    DEVICE = None
 
     SMOOTHING_FRAMES = 9
     MIN_TRACK_AGE = 8
