@@ -15,6 +15,13 @@ from analytics import compute_analytics
 
 
 # ============================================================
+# ✅ MUST BE FIRST STREAMLIT COMMAND
+# ============================================================
+
+st.set_page_config(layout="wide")
+
+
+# ============================================================
 # ✅ LOAD MODEL ONCE (THREAD-SAFE)
 # ============================================================
 
@@ -35,14 +42,14 @@ RTC_CONFIGURATION = RTCConfiguration(
 
 
 # ============================================================
-# VIDEO PROCESSOR (LIVE INFERENCE)
+# VIDEO PROCESSOR
 # ============================================================
 
 class VideoProcessor(VideoProcessorBase):
     def __init__(self, model):
         self.model = model
         self.frame_count = 0
-        self.skip = 12   # 🔥 controls smoothness
+        self.skip = 12
 
     def recv(self, frame):
 
@@ -69,7 +76,7 @@ class VideoProcessor(VideoProcessorBase):
 
 
 # ============================================================
-# FFMPEG RE-ENCODER
+# FFMPEG
 # ============================================================
 
 def reencode_for_browser(src, dst):
@@ -77,15 +84,10 @@ def reencode_for_browser(src, dst):
     ffmpeg_bin = shutil.which("ffmpeg")
 
     if ffmpeg_bin is None:
-        raise RuntimeError(
-            "FFmpeg not found in environment. "
-            "For Streamlit Cloud: ensure packages.txt contains 'ffmpeg'"
-        )
+        raise RuntimeError("FFmpeg not found")
 
     cmd = [
-        ffmpeg_bin,
-        "-y",
-        "-i", src,
+        ffmpeg_bin, "-y", "-i", src,
         "-vcodec", "libx264",
         "-preset", "fast",
         "-pix_fmt", "yuv420p",
@@ -98,16 +100,13 @@ def reencode_for_browser(src, dst):
 
 
 # ============================================================
-# STREAMLIT UI
+# UI
 # ============================================================
 
-st.set_page_config(layout="wide")
 st.title("🎓 Student Activity Detection Dashboard")
 
 
-# ============================================================
-# ✅ LIVE MODE
-# ============================================================
+# ================= LIVE =================
 
 st.subheader("📡 Live Classroom Monitoring")
 
@@ -119,9 +118,7 @@ webrtc_streamer(
 )
 
 
-# ============================================================
-# FILE UPLOAD MODE
-# ============================================================
+# ================= UPLOAD MODE =================
 
 uploaded_file = st.file_uploader(
     "Upload classroom video",
@@ -149,114 +146,35 @@ if uploaded_file:
                 progress_bar.progress(min(int(p * 100), 100))
 
             def frame_cb(frame):
-
                 preview = cv2.resize(frame, (960, 540))
                 rgb = cv2.cvtColor(preview, cv2.COLOR_BGR2RGB)
+                frame_slot.image(rgb, channels="RGB", use_container_width=True)
 
-                frame_slot.image(
-                    rgb,
-                    channels="RGB",
-                    use_container_width=True,
-                )
-
-            with st.spinner("Running inference..."):
-
-                out_vid, out_csv = run_inference_streaming(
-                    input_path,
-                    output_video,
-                    csv_file,
-                    model_path="runs/detect/weights/best.pt",
-                    progress_callback=progress_cb,
-                    frame_callback=frame_cb,
-                )
+            out_vid, out_csv = run_inference_streaming(
+                input_path,
+                output_video,
+                csv_file,
+                model_path="runs/detect/weights/best.pt",
+                progress_callback=progress_cb,
+                frame_callback=frame_cb,
+            )
 
             st.success("Inference complete!")
 
             browser_video = out_vid.replace(".mp4", "_browser.mp4")
+            reencode_for_browser(out_vid, browser_video)
 
-            with st.spinner("Preparing video for playback..."):
-                reencode_for_browser(out_vid, browser_video)
-
-            with open(browser_video, "rb") as f:
-                video_bytes = f.read()
-
-            with open(out_csv, "rb") as f:
-                csv_bytes = f.read()
+            video_bytes = open(browser_video, "rb").read()
+            csv_bytes = open(out_csv, "rb").read()
 
             analytics = compute_analytics(out_csv)
 
             col1, col2 = st.columns([2, 1])
 
             with col1:
-                st.subheader("🎥 Annotated Video")
                 st.video(video_bytes)
 
-                st.download_button(
-                    "⬇ Download Video",
-                    video_bytes,
-                    file_name="output_inference_browser.mp4",
-                    mime="video/mp4",
-                )
-
             with col2:
-                st.subheader("📊 Summary")
+                st.metric("Total Students Detected", analytics["total_students"])
 
-                st.metric(
-                    "Total Students Detected",
-                    analytics["total_students"],
-                )
-
-                st.subheader("Activity Distribution")
-
-                fig = px.bar(
-                    analytics["activity_distribution"],
-                    x="class_name",
-                    y="frames",
-                    hover_data=["students"],
-                    labels={
-                        "class_name": "Activity",
-                        "frames": "Total Frames",
-                        "students": "Student IDs",
-                    },
-                )
-
-                st.plotly_chart(fig, use_container_width=True)
-
-                st.download_button(
-                    "⬇ Download CSV",
-                    csv_bytes,
-                    file_name="detections.csv",
-                    mime="text/csv",
-                )
-
-            st.subheader("📈 Activity Timeline (Frame vs Activity)")
-
-            timeline_df = analytics["timeline"].reset_index()
-
-            timeline_long = timeline_df.melt(
-                id_vars="frame",
-                var_name="Activity",
-                value_name="Number of Students",
-            )
-
-            fig_timeline = px.line(
-                timeline_long,
-                x="frame",
-                y="Number of Students",
-                color="Activity",
-                labels={
-                    "frame": "Frame Number (Time)",
-                    "Number of Students": "Students Performing Activity",
-                },
-            )
-
-            st.plotly_chart(fig_timeline, use_container_width=True)
-
-            st.subheader("🧾 Raw Detection Log (Preview)")
-            st.dataframe(analytics["raw_df"].head(400))
-
-            st.subheader("⏱ Per-Student Activity Duration (seconds)")
-            st.dataframe(
-                analytics["student_activity_duration"],
-                use_container_width=True
-            )
+            st.dataframe(analytics["student_activity_duration"])
