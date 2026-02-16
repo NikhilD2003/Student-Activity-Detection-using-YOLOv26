@@ -25,10 +25,7 @@ def run_inference_streaming(
     SMOOTHING_FRAMES = 9
     MIN_TRACK_AGE = 8
 
-    # 🔥 Preview control
-    PREVIEW_FPS = 6
     PREVIEW_SIZE = (960, 540)
-    last_preview_time = 0
 
     model = YOLO(model_path)
 
@@ -69,6 +66,9 @@ def run_inference_streaming(
     next_student_id = 1
 
     frame_num = 0
+
+    # 🔥 For real-time playback feel
+    start_time = time.time()
 
     while True:
 
@@ -156,13 +156,17 @@ def run_inference_streaming(
 
         writer.write(annotated)
 
-        # ✅ Smooth preview with fixed FPS
+        # ✅ VIDEO-SPEED PREVIEW
         if frame_callback:
-            current_time = time.time()
-            if current_time - last_preview_time >= 1 / PREVIEW_FPS:
-                preview = cv2.resize(annotated, PREVIEW_SIZE)
-                frame_callback(preview)
-                last_preview_time = current_time
+
+            preview = cv2.resize(annotated, PREVIEW_SIZE)
+            frame_callback(preview)
+
+            target_time = start_time + (frame_num / fps)
+            sleep_time = target_time - time.time()
+
+            if sleep_time > 0:
+                time.sleep(sleep_time)
 
     cap.release()
     writer.release()
