@@ -9,4 +9,7 @@ python-dateutil
 matplotlib
 lap
 plotly
-streamlit-webrtc
+streamlit-webrtc==0.47.1
+aiortc==1.6.0
+aioice==0.7.6
+av
