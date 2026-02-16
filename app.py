@@ -4,7 +4,7 @@ import os
 import cv2
 import subprocess
 import shutil
-import plotly.express as px   # already used for bar chart
+import plotly.express as px
 
 from inference_engine import run_inference_streaming
 from analytics import compute_analytics
@@ -173,7 +173,7 @@ if uploaded_file:
                 )
 
             # ====================================================
-            # ✅ UPDATED TIMELINE (ONLY CHANGE)
+            # TIMELINE
             # ====================================================
 
             st.subheader("📈 Activity Timeline (Frame vs Activity)")
@@ -200,6 +200,19 @@ if uploaded_file:
             st.plotly_chart(fig_timeline, use_container_width=True)
 
             # ====================================================
+            # RAW LOG
+            # ====================================================
 
             st.subheader("🧾 Raw Detection Log (Preview)")
             st.dataframe(analytics["raw_df"].head(400))
+
+            # ====================================================
+            # ✅ NEW TABLE — PER STUDENT ACTIVITY DURATION
+            # ====================================================
+
+            st.subheader("⏱ Per-Student Activity Duration (seconds)")
+
+            st.dataframe(
+                analytics["student_activity_duration"],
+                use_container_width=True
+            )
