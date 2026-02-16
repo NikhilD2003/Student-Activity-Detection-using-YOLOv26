@@ -15,11 +15,14 @@ from analytics import compute_analytics
 
 
 # ============================================================
-# ✅ LOAD MODEL ONCE (MAIN THREAD ONLY)
+# ✅ LOAD MODEL ONCE (THREAD-SAFE)
 # ============================================================
 
-if "model" not in st.session_state:
-    st.session_state.model = YOLO("runs/detect/weights/best.pt")
+@st.cache_resource
+def load_model():
+    return YOLO("runs/detect/weights/best.pt")
+
+model = load_model()
 
 
 # ============================================================
@@ -32,14 +35,14 @@ RTC_CONFIGURATION = RTCConfiguration(
 
 
 # ============================================================
-# VIDEO PROCESSOR
+# VIDEO PROCESSOR (LIVE INFERENCE)
 # ============================================================
 
 class VideoProcessor(VideoProcessorBase):
     def __init__(self, model):
         self.model = model
         self.frame_count = 0
-        self.skip = 12   # 🔥 smoothness control
+        self.skip = 12   # 🔥 controls smoothness
 
     def recv(self, frame):
 
@@ -111,13 +114,13 @@ st.subheader("📡 Live Classroom Monitoring")
 webrtc_streamer(
     key="live",
     rtc_configuration=RTC_CONFIGURATION,
-    video_processor_factory=lambda: VideoProcessor(st.session_state.model),
+    video_processor_factory=lambda: VideoProcessor(model),
     media_stream_constraints={"video": True, "audio": False},
 )
 
 
 # ============================================================
-# FILE UPLOAD MODE (UNCHANGED)
+# FILE UPLOAD MODE
 # ============================================================
 
 uploaded_file = st.file_uploader(
