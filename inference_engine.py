@@ -27,7 +27,7 @@ def run_inference_streaming(
     DEVICE = None
 
     SMOOTHING_FRAMES = 9
-    MIN_TRACK_AGE = 8
+    MIN_TRACK_AGE = 12
 
     PREVIEW_SIZE = (960, 540)
 
