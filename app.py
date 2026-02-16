@@ -53,15 +53,17 @@ def reencode_for_browser(src, dst):
 
 
 # ============================================================
-# SESSION STATE
+# SESSION STATE INIT (MODEL ONLY HERE)
 # ============================================================
+
+if "model" not in st.session_state:
+    st.session_state.model = YOLO("runs/detect/weights/best.pt")
 
 if "live_df" not in st.session_state:
     st.session_state.live_df = pd.DataFrame(columns=[
         "timestamp","frame","student_id","class_name",
         "confidence","x1","y1","x2","y2"
     ])
-    st.session_state.model = YOLO("runs/detect/weights/best.pt")
 
 
 # ============================================================
@@ -75,36 +77,32 @@ mode = st.radio("Select Input Mode", ["Upload Video", "Live Camera"])
 
 
 # ============================================================
-# 🔴 LIVE MODE (CLOUD SAFE)
+# 🔴 LIVE MODE
 # ============================================================
 
 if mode == "Live Camera":
 
     class VideoProcessor(VideoProcessorBase):
 
-        def __init__(self):
+        def __init__(self, model):
+            self.model = model
             self.frame_count = 0
-            self.skip = 8   # 🔥 run YOLO every N frames
+            self.skip = 8
 
         def recv(self, frame):
 
             img = frame.to_ndarray(format="bgr24")
             self.frame_count += 1
 
-            # ✅ Warmup frames (VERY IMPORTANT)
+            # Warmup frames
             if self.frame_count < 10:
                 return av.VideoFrame.from_ndarray(img, format="bgr24")
 
             annotated = img
 
-            # 🚀 Run detection every N frames
             if self.frame_count % self.skip == 0:
 
-                results = st.session_state.model(
-                    img,
-                    conf=0.3,
-                    verbose=False
-                )
+                results = self.model(img, conf=0.3, verbose=False)
 
                 annotated = results[0].plot()
 
@@ -124,7 +122,7 @@ if mode == "Live Camera":
                             timestamp,
                             self.frame_count,
                             i,
-                            st.session_state.model.names[cls[i]],
+                            self.model.names[cls[i]],
                             conf[i],
                             *boxes[i]
                         ]
@@ -138,7 +136,7 @@ if mode == "Live Camera":
 
         ctx = webrtc_streamer(
             key="live",
-            video_processor_factory=VideoProcessor,
+            video_processor_factory=lambda: VideoProcessor(st.session_state.model),
             media_stream_constraints={"video": True, "audio": False},
             rtc_configuration=RTC_CONFIGURATION,
             async_processing=True,
