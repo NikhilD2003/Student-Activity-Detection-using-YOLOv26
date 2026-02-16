@@ -3,6 +3,7 @@ import tempfile
 import os
 import cv2
 import subprocess
+import shutil
 
 from inference_engine import run_inference_streaming
 from analytics import compute_analytics
@@ -11,23 +12,15 @@ from analytics import compute_analytics
 # ============================================================
 # FFMPEG RE-ENCODER (Browser Safe)
 # ============================================================
-import shutil
-import subprocess
-
 
 def reencode_for_browser(src, dst):
-    """
-    Convert any video into H264 + AAC so Streamlit/browser can play it.
-    Works cross-platform (Windows + Linux).
-    """
 
     ffmpeg_bin = shutil.which("ffmpeg")
 
     if ffmpeg_bin is None:
         raise RuntimeError(
             "FFmpeg not found in environment. "
-            "For Streamlit Cloud: ensure packages.txt contains 'ffmpeg' "
-            "and redeploy the app."
+            "For Streamlit Cloud: ensure packages.txt contains 'ffmpeg'"
         )
 
     cmd = [
@@ -72,6 +65,8 @@ if uploaded_file:
         if st.button("▶ Run Detection"):
 
             progress_bar = st.progress(0)
+
+            # ✅ create once (important for speed)
             frame_slot = st.empty()
 
             # ----------------------------------
@@ -82,11 +77,16 @@ if uploaded_file:
                 progress_bar.progress(min(int(p * 100), 100))
 
             def frame_cb(frame):
-                rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+
+                # ✅ resize only for preview (huge speed gain)
+                preview = cv2.resize(frame, (960, 540))
+
+                rgb = cv2.cvtColor(preview, cv2.COLOR_BGR2RGB)
+
                 frame_slot.image(
                     rgb,
                     channels="RGB",
-                    caption="Live Inference Preview",
+                    use_container_width=True,   # faster rendering
                 )
 
             # ----------------------------------
@@ -133,9 +133,7 @@ if uploaded_file:
 
             col1, col2 = st.columns([2, 1])
 
-            # ---------- VIDEO PANEL ----------
             with col1:
-
                 st.subheader("🎥 Annotated Video")
                 st.video(video_bytes)
 
@@ -146,9 +144,7 @@ if uploaded_file:
                     mime="video/mp4",
                 )
 
-            # ---------- SUMMARY PANEL ----------
             with col2:
-
                 st.subheader("📊 Summary")
 
                 st.metric(
@@ -166,10 +162,8 @@ if uploaded_file:
                     mime="text/csv",
                 )
 
-            # ---------- TIMELINE ----------
             st.subheader("📈 Activity Timeline (Frame vs Activity)")
             st.line_chart(analytics["timeline"])
 
-            # ---------- RAW LOG ----------
             st.subheader("🧾 Raw Detection Log (Preview)")
             st.dataframe(analytics["raw_df"].head(400))
