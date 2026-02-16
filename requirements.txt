@@ -1,16 +1,17 @@
-ultralytics
-torch
-torchvision
-opencv-python-headless
-pandas
-numpy
-python-dateutil
-matplotlib
-lap
-plotly
+streamlit==1.32.2
 
-streamlit-webrtc==0.49.0
-aiortc==1.9.0
-av==12.0.0
+ultralytics==8.2.103
 
-altair==4.2.2
+torch==2.2.2
+torchvision==0.17.2
+
+opencv-python-headless==4.9.0.80
+
+pandas==2.2.2
+numpy==1.26.4
+python-dateutil==2.9.0.post0
+
+matplotlib==3.8.4
+plotly==5.22.0
+
+lap==0.5.12
